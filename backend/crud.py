@@ -1,6 +1,6 @@
 from sqlalchemy.orm import Session
 from models import Repo, Commit, PullRequest, Issue
-from github_client import fetch_repo_info, parse_owner_repo_from_url, fetch_commits
+from github_client import fetch_repo_info, parse_owner_repo_from_url, fetch_commits , fetch_commit_detail
 from datetime import datetime
 
 
@@ -57,6 +57,23 @@ def save_commits(db: Session, repo: Repo, raw_commits: list):
 
     db.commit()
     return new_count
+
+def backfill_commit_files(db: Session , repo: Repo , limit:int = 20):
+    commits_missing_files = (
+        db.query(Commit)
+        .filter(Commit.repo_id == repo.id , Commit.files_changed.is_(None))
+        .limit(limit)
+        .all()
+    )
+
+    updated_count = 0
+    for commit in commits_missing_files:
+        files = fetch_commit_detail(repo.owner , repo.name , commit.sha)
+        commit.files_changed = files
+        updated_count += 1
+    
+    db.commit()
+    return updated_count
 
 
 def save_pull_requests(db: Session, repo: Repo, raw_prs: list):

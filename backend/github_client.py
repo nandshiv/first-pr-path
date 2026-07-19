@@ -41,6 +41,14 @@ def fetch_commits(owner: str , repo: str , max_pages: int = 5):
     page += 1
   return commits
 
+def fetch_commit_detail(owner: str , repo: str , sha:str):
+  url = f"{BASE_URL}/repos/{owner}/{repo}/commits/{sha}"
+  response = requests.get(url , headers= get_headers())
+  response.raise_for_status()
+  data = response.json();
+  files = [f["filename"] for f in data.get("files" , [])]
+  return files
+
 def fetch_pull_requests(owner:str , repo:str , max_pages: int = 5):
   prs=[]
   page = 1

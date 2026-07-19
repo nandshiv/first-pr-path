@@ -3,8 +3,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 from pydantic import BaseModel
+from models import Repo
 from database import get_db , init_db
-from crud import create_repo_from_url , save_commits , save_issues , save_pull_requests
+from crud import create_repo_from_url , save_commits , save_issues , save_pull_requests , backfill_commit_files
 from github_client import fetch_commits , fetch_issues , fetch_pull_requests
 
 app = FastAPI()
@@ -54,3 +55,11 @@ def add_repo(request : RepoCreateRequest , db : Session = Depends(get_db)):
         "prs_saved": prs_saved,
         "issues_saved": issues_saved
     }
+
+@app.post("/repo/{repo_id}/backfill-files")
+def backfill_files(repo_id = str , db: Session = Depends(get_db)):
+    repo = db.query(Repo).filter(Repo.id == repo_id).first()
+    if not repo:
+        return {"error" : "repo not found"}
+    updated = backfill_commit_files(db , repo , limit=20)
+    return {"commits_updated" : updated}
