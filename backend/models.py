@@ -1,4 +1,4 @@
-from sqlalchemy import Column, String, DateTime, ARRAY, ForeignKey , Integer
+from sqlalchemy import Column, String, DateTime, ARRAY, ForeignKey , Integer , Float
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import declarative_base
 import uuid
@@ -44,3 +44,10 @@ class Issue(Base):
     body = Column(String , nullable = True)
     state = Column(String , nullable = True)
     labels = Column(ARRAY(String) , nullable = True)
+
+class FileCentrality(Base):
+    __tablename__ = "file_centrality"
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    repo_id = Column(UUID(as_uuid=True), ForeignKey("repos.id"), nullable=False)
+    file_path = Column(String, nullable=False)
+    centrality_score = Column(Float, nullable=False)

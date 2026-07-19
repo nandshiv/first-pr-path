@@ -1,6 +1,7 @@
 import networkx as nx
 from sqlalchemy.orm import Session
-from models import Commit
+from models import Commit , FileCentrality
+import uuid
 
 def build_coupling_graph(db: Session, repo_id: str):
     commits = (
@@ -30,3 +31,21 @@ def compute_centrality(G: nx.Graph):
     if G.number_of_nodes() == 0:
         return {}
     return nx.degree_centrality(G)
+
+def save_centrality_scores(db: Session, repo_id: str):
+    G = build_coupling_graph(db, repo_id)
+    scores = compute_centrality(G)
+
+    db.query(FileCentrality).filter(FileCentrality.repo_id == repo_id).delete()
+
+    for file_path, score in scores.items():
+        entry = FileCentrality(
+            id=uuid.uuid4(),
+            repo_id=repo_id,
+            file_path=file_path,
+            centrality_score=score
+        )
+        db.add(entry)
+
+    db.commit()
+    return len(scores)
