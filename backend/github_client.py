@@ -80,3 +80,18 @@ def fetch_issues(owner:str , repo:str , max_pages:int = 5):
     page += 1
   
   return issues
+
+def fetch_pr_comments(owner: str, repo: str, pr_number: int, max_pages: int = 2):
+    comments = []
+    page = 1
+    while page <= max_pages:
+        url = f"{BASE_URL}/repos/{owner}/{repo}/issues/{pr_number}/comments"
+        params = {"per_page": 100, "page": page}
+        response = requests.get(url, headers=get_headers(), params=params)
+        response.raise_for_status()
+        data = response.json()
+        if not data:
+            break
+        comments.extend(data)
+        page += 1
+    return comments

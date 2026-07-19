@@ -8,6 +8,8 @@ from database import get_db , init_db
 from crud import create_repo_from_url , save_commits , save_issues , save_pull_requests , backfill_commit_files
 from github_client import fetch_commits , fetch_issues , fetch_pull_requests
 from graph_analysis import save_centrality_scores
+from embeddings import embed_and_store_prs
+from explain import explain_file
 
 app = FastAPI()
 
@@ -79,3 +81,17 @@ def get_centrality(repo_id: str, db: Session = Depends(get_db)):
         .all()
     )
     return [{"file_path": s.file_path, "score": s.centrality_score} for s in scores]
+
+@app.post("/repos/{repo_id}/embed-prs")
+def embed_prs_endpoint(repo_id:str , db: Session = Depends(get_db)):
+    repo = db.query(Repo).filter(Repo.id == repo_id).first()
+    if not repo:
+        return {"error": "repo not found"}
+    
+    count = embed_and_store_prs(db, repo_id, repo.owner, repo.name, limit=10)
+    return {"chunks_created": count}
+
+@app.get("/repos/{repo_id}/explain")
+def explain_file_endpoint(repo_id: str, file_path: str, db: Session = Depends(get_db)):
+    result = explain_file(db, repo_id, file_path)
+    return result

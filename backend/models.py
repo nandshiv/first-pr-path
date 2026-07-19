@@ -1,6 +1,7 @@
 from sqlalchemy import Column, String, DateTime, ARRAY, ForeignKey , Integer , Float
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import declarative_base
+from pgvector.sqlalchemy import Vector
 import uuid
 
 Base = declarative_base()
@@ -51,3 +52,14 @@ class FileCentrality(Base):
     repo_id = Column(UUID(as_uuid=True), ForeignKey("repos.id"), nullable=False)
     file_path = Column(String, nullable=False)
     centrality_score = Column(Float, nullable=False)
+
+class DocumentChunk(Base):
+    __tablename__ = "document_chunks"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    repo_id = Column(UUID(as_uuid=True), ForeignKey("repos.id"), nullable=False)
+    source_type = Column(String, nullable=False)
+    source_id = Column(String, nullable=False)
+    file_path = Column(String, nullable=True)
+    chunk_text = Column(String, nullable=False)
+    embedding = Column(Vector(384), nullable=False)
