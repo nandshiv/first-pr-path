@@ -45,6 +45,7 @@ class Issue(Base):
     body = Column(String , nullable = True)
     state = Column(String , nullable = True)
     labels = Column(ARRAY(String) , nullable = True)
+    updated_at = Column(DateTime, nullable=True)
 
 class FileCentrality(Base):
     __tablename__ = "file_centrality"
@@ -63,3 +64,11 @@ class DocumentChunk(Base):
     file_path = Column(String, nullable=True)
     chunk_text = Column(String, nullable=False)
     embedding = Column(Vector(384), nullable=False)
+
+class ResolutionReport(Base):
+    __tablename__ = "resolution_reports"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    issue_id = Column(UUID(as_uuid=True), ForeignKey("issues.id"), nullable=False)
+    pr_url = Column(String, nullable=True)
+    reported_at = Column(DateTime, nullable=False)

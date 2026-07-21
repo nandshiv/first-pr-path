@@ -95,3 +95,9 @@ def fetch_pr_comments(owner: str, repo: str, pr_number: int, max_pages: int = 2)
         comments.extend(data)
         page += 1
     return comments
+
+def fetch_issue_state(owner: str, repo: str, issue_number: int):
+    url = f"{BASE_URL}/repos/{owner}/{repo}/issues/{issue_number}"
+    response = requests.get(url, headers=get_headers())
+    response.raise_for_status()
+    return response.json()["state"]

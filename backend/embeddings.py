@@ -1,6 +1,6 @@
 from sentence_transformers import SentenceTransformer
 from sqlalchemy.orm import Session
-from models import DocumentChunk, PullRequest, Issue
+from models import DocumentChunk, PullRequest, Issue 
 from github_client import fetch_pr_comments
 import uuid
 
@@ -77,3 +77,45 @@ def retrieve_relevant_chunks(db:Session , repo_id: str , query_text: str , top_k
         .all()
     )
     return results
+
+from models import Issue
+
+def embed_and_store_issues(db: Session, repo_id: str, limit: int = 20):
+    model = get_model()
+
+    issues = (
+        db.query(Issue)
+        .filter(Issue.repo_id == repo_id, Issue.state == "open")
+        .limit(limit)
+        .all()
+    )
+
+    chunks_created = 0
+    for issue in issues:
+        already_embedded = (
+            db.query(DocumentChunk)
+            .filter(DocumentChunk.source_type == "issue_body", DocumentChunk.source_id == str(issue.github_issue_number))
+            .first()
+        )
+        if already_embedded:
+            continue
+
+        text = f"{issue.title or ''}\n{issue.body or ''}".strip()
+        if not text:
+            continue
+
+        embedding = model.encode(text)
+        chunk = DocumentChunk(
+            id=uuid.uuid4(),
+            repo_id=repo_id,
+            source_type="issue_body",
+            source_id=str(issue.github_issue_number),
+            file_path=None,
+            chunk_text=text,
+            embedding=embedding
+        )
+        db.add(chunk)
+        chunks_created += 1
+
+    db.commit()
+    return chunks_created

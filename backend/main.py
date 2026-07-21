@@ -3,13 +3,15 @@ from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 from pydantic import BaseModel
-from models import Repo , FileCentrality
+from datetime import datetime , timezone
+from models import Repo , FileCentrality , ResolutionReport
 from database import get_db , init_db
 from crud import create_repo_from_url , save_commits , save_issues , save_pull_requests , backfill_commit_files
 from github_client import fetch_commits , fetch_issues , fetch_pull_requests
 from graph_analysis import save_centrality_scores
-from embeddings import embed_and_store_prs
+from embeddings import embed_and_store_prs , embed_and_store_issues
 from explain import explain_file
+from matching import score_issues_for_user , get_verified_open_issues
 
 app = FastAPI()
 
@@ -95,3 +97,45 @@ def embed_prs_endpoint(repo_id:str , db: Session = Depends(get_db)):
 def explain_file_endpoint(repo_id: str, file_path: str, db: Session = Depends(get_db)):
     result = explain_file(db, repo_id, file_path)
     return result
+
+@app.post("/issues/{issue_id}/report-resolution")
+def report_resolution(issue_id: str, pr_url: str = None, db: Session = Depends(get_db)):
+    issue = db.query(Issue).filter(Issue.id == issue_id).first()
+    if not issue:
+        return {"error": "issue not found"}
+
+    report = ResolutionReport(
+        id=uuid.uuid4(),
+        issue_id=issue_id,
+        pr_url=pr_url,
+        reported_at=datetime.now(timezone.utc)
+    )
+    db.add(report)
+    db.commit()
+    return {"status": "report recorded, will be verified against GitHub separately"}
+
+@app.post("/repos/{repo_id}/embed-issues")
+def embed_issues_endpoint(repo_id: str, db: Session = Depends(get_db)):
+    count = embed_and_store_issues(db, repo_id, limit=20)
+    return {"chunks_created": count}
+
+@app.post("/repos/{repo_id}/recommendations")
+def get_recommendations(repo_id: str, skill_profile: str, db: Session = Depends(get_db)):
+    repo = db.query(Repo).filter(Repo.id == repo_id).first()
+    if not repo:
+        return {"error": "repo not found"}
+
+    candidates = score_issues_for_user(db, repo_id, skill_profile, top_n=15)
+    verified = get_verified_open_issues(db, repo, candidates, needed=5)
+
+    return [
+        {
+            "issue_number": c["issue"].github_issue_number,
+            "title": c["issue"].title,
+            "fit_score": round(c["fit_score"], 3),
+            "similarity": round(c["similarity"], 3),
+            "centrality": round(c["centrality"], 3),
+            "staleness_days": c["staleness_days"]
+        }
+        for c in verified
+    ]

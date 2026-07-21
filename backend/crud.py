@@ -103,6 +103,8 @@ def save_pull_requests(db: Session, repo: Repo, raw_prs: list):
     return new_count
 
 
+
+
 def save_issues(db: Session, repo: Repo, raw_issues: list):
     existing_numbers = {row.github_issue_number for row in db.query(Issue.github_issue_number).filter(Issue.repo_id == repo.id).all()}
 
@@ -112,13 +114,17 @@ def save_issues(db: Session, repo: Repo, raw_issues: list):
         if number in existing_numbers:
             continue
 
+        updated_at_str = raw.get("updated_at")
+        updated_at = datetime.fromisoformat(updated_at_str.replace("Z", "+00:00")) if updated_at_str else None
+
         new_issue = Issue(
             repo_id=repo.id,
             github_issue_number=number,
             title=raw.get("title"),
             body=raw.get("body"),
             state=raw.get("state"),
-            labels=[label["name"] for label in raw.get("labels", [])]
+            labels=[label["name"] for label in raw.get("labels", [])],
+            updated_at=updated_at
         )
         db.add(new_issue)
         new_count += 1
