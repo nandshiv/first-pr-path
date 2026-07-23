@@ -1,6 +1,6 @@
 from sqlalchemy.orm import Session
 from sqlalchemy import text as sql_text
-from models import Issue, FileCentrality
+from models import Issue, FileCentrality, FileCoupling
 from embeddings import get_model
 import numpy as np
 from datetime import datetime, timezone
@@ -30,6 +30,7 @@ def score_issues_for_user(db: Session, repo_id: str, skill_profile_text: str, to
             continue
 
         matched_files, avg_centrality = _matched_files_for_issue(db, repo_id, issue)
+        related_files = _related_files_for_matched(db, repo_id, matched_files)
         staleness_days = _staleness_days(issue.updated_at)
         staleness_penalty = min(staleness_days / 365, 1.0)
 
@@ -40,6 +41,7 @@ def score_issues_for_user(db: Session, repo_id: str, skill_profile_text: str, to
             "similarity": row.similarity,
             "centrality": avg_centrality,
             "matched_files": matched_files,
+            "related_files": related_files,
             "staleness_days": staleness_days,
             "fit_score": fit_score
         })
@@ -112,3 +114,22 @@ def _matched_files_for_issue(db: Session, repo_id: str, issue: Issue):
 
     avg_score = sum(f.centrality_score for f in all_files) / len(all_files)
     return [], avg_score
+
+def _related_files_for_matched(db: Session, repo_id: str, matched_files: list, top_k: int = 3):
+    if not matched_files:
+        return []
+
+    couplings = db.query(FileCoupling).filter(
+        FileCoupling.repo_id == repo_id,
+        (FileCoupling.file_a.in_(matched_files)) | (FileCoupling.file_b.in_(matched_files))
+    ).all()
+
+    related_weights = {}
+    for c in couplings:
+        other = c.file_b if c.file_a in matched_files else c.file_a
+        if other in matched_files:
+            continue
+        related_weights[other] = related_weights.get(other, 0) + c.weight
+
+    sorted_related = sorted(related_weights.items(), key=lambda x: x[1], reverse=True)
+    return [file_path for file_path, weight in sorted_related[:top_k]]

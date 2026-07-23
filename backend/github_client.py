@@ -101,3 +101,12 @@ def fetch_issue_state(owner: str, repo: str, issue_number: int):
     response = requests.get(url, headers=get_headers())
     response.raise_for_status()
     return response.json()["state"]
+
+def fetch_git_tree(owner: str, repo: str, sha: str):
+    url = f"{BASE_URL}/repos/{owner}/{repo}/git/trees/{sha}"
+    params = {"recursive": 1}
+    response = requests.get(url, headers=get_headers(), params=params)
+    response.raise_for_status()
+    tree_data = response.json().get("tree", [])
+    files = [item["path"] for item in tree_data if item.get("type") == "blob"]
+    return files[:10000]

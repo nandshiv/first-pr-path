@@ -6,10 +6,10 @@ from sqlalchemy.orm import Session
 from sqlalchemy import text
 from pydantic import BaseModel
 from datetime import datetime, timezone
-from models import Repo, FileCentrality, ResolutionReport, Issue
+from models import Repo, FileCentrality, ResolutionReport, Issue, RepoFile, Commit
 from database import get_db, init_db
-from crud import create_repo_from_url, save_commits, save_issues, save_pull_requests, backfill_commit_files
-from github_client import fetch_commits, fetch_issues, fetch_pull_requests
+from crud import create_repo_from_url, save_commits, save_issues, save_pull_requests, backfill_commit_files, save_repo_files
+from github_client import fetch_commits, fetch_issues, fetch_pull_requests, fetch_git_tree
 from graph_analysis import save_centrality_scores
 from embeddings import embed_and_store_prs, embed_and_store_issues
 from explain import explain_file
@@ -61,6 +61,15 @@ def add_repo(request: RepoCreateRequest, db: Session = Depends(get_db)):
     embed_and_store_prs(db, str(repo.id), repo.owner, repo.name, limit=10)
     embed_and_store_issues(db, str(repo.id), limit=20)
 
+    # Ingest git file tree
+    latest_commit = db.query(Commit).filter(Commit.repo_id == repo.id).order_by(Commit.authored_at.desc()).first()
+    tree_sha = latest_commit.sha if latest_commit else "main"
+    try:
+        files = fetch_git_tree(repo.owner, repo.name, tree_sha)
+        save_repo_files(db, repo, files)
+    except Exception as e:
+        print(f"Failed to fetch git tree: {e}")
+
     return {
         "id": str(repo.id),
         "owner": repo.owner,
@@ -71,6 +80,35 @@ def add_repo(request: RepoCreateRequest, db: Session = Depends(get_db)):
         "prs_saved": prs_saved,
         "issues_saved": issues_saved
     }
+
+@app.get("/repos/{repo_id}")
+def get_repo_details(repo_id: str, db: Session = Depends(get_db)):
+    repo = db.query(Repo).filter(Repo.id == repo_id).first()
+    if not repo:
+        return {"error": "repo not found"}
+    return {
+        "id": str(repo.id),
+        "owner": repo.owner,
+        "name": repo.name,
+        "description": repo.description,
+        "language": repo.language,
+        "github_url": repo.github_url
+    }
+
+@app.get("/repos/{repo_id}/files")
+def get_repo_files(repo_id: str, db: Session = Depends(get_db)):
+    files = db.query(RepoFile).filter(RepoFile.repo_id == repo_id).all()
+    centrality_scores = {
+        s.file_path: s.centrality_score
+        for s in db.query(FileCentrality).filter(FileCentrality.repo_id == repo_id).all()
+    }
+    return [
+        {
+            "file_path": f.file_path,
+            "centrality_score": centrality_scores.get(f.file_path, None)
+        }
+        for f in files
+    ]
 
 @app.post("/repos/{repo_id}/backfill-files")
 def backfill_files(repo_id: str, db: Session = Depends(get_db)):
@@ -149,6 +187,7 @@ def get_recommendations(repo_id: str, skill_profile: str, db: Session = Depends(
             "similarity": round(c["similarity"], 3),
             "centrality": round(c["centrality"], 3),
             "matched_files": c["matched_files"],
+            "related_files": c["related_files"],
             "staleness_days": c["staleness_days"]
         }
         for c in verified

@@ -1,14 +1,17 @@
 import { useState } from "react";
 import ThemeToggle from "./ThemeToggle";
 import IntakeForm from "./IntakeForm";
-import { createRepo, getRecommendations } from "./api";
+import { createRepo, getRecommendations, getRepoDetails, getRepoFiles } from "./api";
 import ResultsList from "./ResultsList";
+import RepoOverview from "./RepoOverview";
 
 function App() {
   const [status, setStatus] = useState("idle");
   const [errorMessage, setErrorMessage] = useState("");
   const [recommendations, setRecommendations] = useState(null);
   const [repoId, setRepoId] = useState(null);
+  const [repoDetails, setRepoDetails] = useState(null);
+  const [repoFiles, setRepoFiles] = useState([]);
 
   const handleFormSubmit = async ({ repoUrl, skillProfileText }) => {
     setStatus("loading");
@@ -17,7 +20,15 @@ function App() {
     try {
       const repo = await createRepo(repoUrl);
       setRepoId(repo.id);
-      const results = await getRecommendations(repo.id, skillProfileText);
+
+      const [details, files, results] = await Promise.all([
+        getRepoDetails(repo.id),
+        getRepoFiles(repo.id),
+        getRecommendations(repo.id, skillProfileText)
+      ]);
+
+      setRepoDetails(details);
+      setRepoFiles(files);
 
       if (!results || results.length === 0) {
         setErrorMessage(
@@ -42,6 +53,8 @@ function App() {
     setStatus("idle");
     setRecommendations(null);
     setRepoId(null);
+    setRepoDetails(null);
+    setRepoFiles([]);
     setErrorMessage("");
   };
 
@@ -121,11 +134,14 @@ function App() {
         )}
 
         {status === "done" && (
-          <ResultsList
-            recommendations={recommendations}
-            repoId={repoId}
-            onBack={handleBack}
-          />
+          <>
+            <RepoOverview details={repoDetails} files={repoFiles} />
+            <ResultsList
+              recommendations={recommendations}
+              repoId={repoId}
+              onBack={handleBack}
+            />
+          </>
         )}
       </main>
     </div>

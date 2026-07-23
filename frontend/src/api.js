@@ -29,3 +29,30 @@ export async function explainFile(repoId, filePath) {
   }
   return response.json();
 }
+
+export async function getRepoDetails(repoId) {
+  const url = `${API_BASE}/repos/${repoId}`;
+  const response = await fetch(url);
+  if (!response.ok) {
+    throw new Error("Failed to fetch repo details");
+  }
+  return response.json();
+}
+
+export async function getCentrality(repoId) {
+  const url = `${API_BASE}/repos/${repoId}/centrality`;
+  const response = await fetch(url);
+  if (!response.ok) {
+    throw new Error("Failed to fetch file centrality");
+  }
+  return response.json();
+}
+
+export async function getRepoFiles(repoId) {
+  const url = `${API_BASE}/repos/${repoId}/files`;
+  const response = await fetch(url);
+  if (!response.ok) {
+    throw new Error("Failed to fetch repo file tree");
+  }
+  return response.json();
+}

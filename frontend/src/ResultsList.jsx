@@ -66,7 +66,6 @@ function IssueCard({ rec, repoId }) {
   const [expanded, setExpanded] = useState(false);
   const [explanation, setExplanation] = useState(null);
   const [loadingExplanation, setLoadingExplanation] = useState(false);
-  const [showBody, setShowBody] = useState(false);
 
   const fitPercent = Math.max(
     0,
@@ -194,81 +193,142 @@ function IssueCard({ rec, repoId }) {
         </span>
       </div>
 
-      {rec.body && (
-        <div style={{ marginBottom: "0.8rem" }}>
-          <button
-            onClick={() => setShowBody(!showBody)}
+      <div style={{ marginTop: "0.8rem" }}>
+        <button
+          onClick={handleExpand}
+          style={{
+            background: "none",
+            border: "none",
+            color: "var(--accent)",
+            cursor: "pointer",
+            fontSize: "0.85rem",
+            padding: 0,
+            marginBottom: expanded ? "0.8rem" : 0,
+          }}
+        >
+          {expanded ? "▲ Hide details" : "▼ See description & details"}
+        </button>
+
+        {expanded && (
+          <div
             style={{
-              background: "none",
-              border: "none",
-              color: "var(--accent)",
-              cursor: "pointer",
-              fontSize: "0.85rem",
-              padding: 0,
-              marginBottom: showBody ? "0.4rem" : 0,
+              display: "flex",
+              flexDirection: "column",
+              gap: "1rem",
+              padding: "1rem",
+              borderRadius: "var(--radius)",
+              background: "var(--bg)",
+              border: "1px solid var(--border)",
+              marginTop: "0.5rem",
             }}
           >
-            {showBody ? "▲ Hide description" : "▼ Show description"}
-          </button>
-          {showBody && (
-            <div
-              style={{
-                padding: "0.8rem",
-                borderRadius: "var(--radius)",
-                background: "var(--bg)",
-                border: "1px solid var(--border)",
-                fontSize: "0.85rem",
-                color: "var(--text)",
-                maxHeight: "200px",
-                overflowY: "auto",
-                whiteSpace: "pre-wrap",
-              }}
-            >
-              {rec.body}
-            </div>
-          )}
-        </div>
-      )}
-
-      {hasMatchedFile && (
-        <>
-          <button
-            onClick={handleExpand}
-            style={{
-              background: "none",
-              border: "none",
-              color: "var(--accent)",
-              cursor: "pointer",
-              fontSize: "0.85rem",
-              padding: 0,
-            }}
-          >
-            {expanded
-              ? "▲ Hide reasoning"
-              : `▼ Why is ${rec.matched_files[0]} built this way?`}
-          </button>
-
-          {expanded && (
-            <div
-              style={{
-                marginTop: "0.8rem",
-                paddingTop: "0.8rem",
-                borderTop: "1px solid var(--border)",
-                fontSize: "0.9rem",
-                color: "var(--text)",
-              }}
-            >
-              {loadingExplanation ? (
-                <span style={{ color: "var(--text-muted)" }}>
-                  Reading commit history...
+            {/* Description */}
+            {rec.body ? (
+              <div>
+                <h4 style={{ margin: "0 0 0.4rem 0", fontSize: "0.8rem", textTransform: "uppercase", letterSpacing: "0.05em", color: "var(--text-muted)" }}>
+                  Description
+                </h4>
+                <div
+                  style={{
+                    fontSize: "0.85rem",
+                    color: "var(--text)",
+                    maxHeight: "200px",
+                    overflowY: "auto",
+                    whiteSpace: "pre-wrap",
+                  }}
+                >
+                  {rec.body}
+                </div>
+              </div>
+            ) : (
+              <div>
+                <span style={{ fontSize: "0.85rem", color: "var(--text-muted)", fontStyle: "italic" }}>
+                  No description provided for this issue.
                 </span>
+              </div>
+            )}
+
+            {/* Files Context */}
+            <div style={{ borderTop: "1px solid var(--border)", paddingTop: "0.8rem" }}>
+              <h4 style={{ margin: "0 0 0.6rem 0", fontSize: "0.8rem", textTransform: "uppercase", letterSpacing: "0.05em", color: "var(--text-muted)" }}>
+                Codebase Files Context
+              </h4>
+
+              {hasMatchedFile ? (
+                <div style={{ display: "flex", flexDirection: "column", gap: "0.6rem" }}>
+                  {/* Directly Matched Files */}
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: "0.4rem", alignItems: "center" }}>
+                    <span style={{ fontSize: "0.75rem", color: "var(--text-muted)", marginRight: "0.2rem" }}>
+                      Matched Files:
+                    </span>
+                    {rec.matched_files.map((file) => (
+                      <span
+                        key={file}
+                        className="mono"
+                        style={{
+                          fontSize: "0.7rem",
+                          padding: "0.2rem 0.5rem",
+                          borderRadius: "4px",
+                          background: "var(--surface)",
+                          border: "1px solid var(--border)",
+                          color: "var(--text-muted)",
+                        }}
+                      >
+                        {file}
+                      </span>
+                    ))}
+                  </div>
+
+                  {/* Related Files */}
+                  {rec.related_files && rec.related_files.length > 0 && (
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: "0.4rem", alignItems: "center" }}>
+                      <span style={{ fontSize: "0.75rem", color: "var(--text-muted)", marginRight: "0.2rem" }}>
+                        Related (co-changed):
+                      </span>
+                      {rec.related_files.map((file) => (
+                        <span
+                          key={file}
+                          className="mono"
+                          style={{
+                            fontSize: "0.65rem",
+                            padding: "0.15rem 0.4rem",
+                            borderRadius: "4px",
+                            background: "var(--surface)",
+                            border: "1px solid var(--border)",
+                            color: "var(--text-muted)",
+                          }}
+                        >
+                          {file}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Why Grounding Explanation */}
+                  <div style={{ marginTop: "0.4rem", borderTop: "1px dashed var(--border)", paddingTop: "0.8rem" }}>
+                    <h5 style={{ margin: "0 0 0.4rem 0", fontSize: "0.75rem", color: "var(--text-muted)" }}>
+                      Why is {rec.matched_files[0]} built this way?
+                    </h5>
+                    {loadingExplanation ? (
+                      <span style={{ fontSize: "0.85rem", color: "var(--text-muted)", fontStyle: "italic" }}>
+                        Reading commit history...
+                      </span>
+                    ) : (
+                      <p style={{ margin: 0, fontSize: "0.85rem", color: "var(--text)", lineHeight: 1.4 }}>
+                        {explanation?.explanation || "Failed to load explanation."}
+                      </p>
+                    )}
+                  </div>
+                </div>
               ) : (
-                <p style={{ margin: 0 }}>{explanation?.explanation}</p>
+                <div style={{ fontSize: "0.85rem", color: "var(--text-muted)", fontStyle: "italic" }}>
+                  No specific file could be identified from this issue's description.
+                </div>
               )}
             </div>
-          )}
-        </>
-      )}
+          </div>
+        )}
+      </div>
     </div>
   );
 }

@@ -1,5 +1,5 @@
 from sqlalchemy.orm import Session
-from models import Repo, Commit, PullRequest, Issue
+from models import Repo, Commit, PullRequest, Issue, RepoFile
 from github_client import fetch_repo_info, parse_owner_repo_from_url, fetch_commits , fetch_commit_detail
 from datetime import datetime
 
@@ -12,9 +12,16 @@ def create_repo_from_url(db: Session, url: str):
 
     existing = db.query(Repo).filter(Repo.github_url == data["html_url"]).first()
     if existing:
+        updated = False
         if existing.owner != canonical_owner or existing.name != canonical_name:
             existing.owner = canonical_owner
             existing.name = canonical_name
+            updated = True
+        if existing.description != data.get("description") or existing.language != data.get("language"):
+            existing.description = data.get("description")
+            existing.language = data.get("language")
+            updated = True
+        if updated:
             db.commit()
         return existing
 
@@ -22,7 +29,9 @@ def create_repo_from_url(db: Session, url: str):
         github_url=data["html_url"],
         owner=canonical_owner,
         name=canonical_name,
-        index_status="pending"
+        index_status="pending",
+        description=data.get("description"),
+        language=data.get("language")
     )
 
     db.add(new_repo)
@@ -131,3 +140,16 @@ def save_issues(db: Session, repo: Repo, raw_issues: list):
 
     db.commit()
     return new_count
+
+def save_repo_files(db: Session, repo: Repo, files: list):
+    import uuid
+    db.query(RepoFile).filter(RepoFile.repo_id == repo.id).delete()
+    for path in files:
+        new_file = RepoFile(
+            id=uuid.uuid4(),
+            repo_id=repo.id,
+            file_path=path
+        )
+        db.add(new_file)
+    db.commit()
+    return len(files)

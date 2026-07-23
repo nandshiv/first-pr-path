@@ -15,6 +15,8 @@ class Repo(Base):
     name = Column(String, nullable=False)
     last_synced_sha = Column(String, nullable=True)
     index_status = Column(String, default="pending")
+    description = Column(String, nullable=True)
+    language = Column(String, nullable=True)
 
 class Commit(Base):
     __tablename__ = "commits"
@@ -72,3 +74,19 @@ class ResolutionReport(Base):
     issue_id = Column(UUID(as_uuid=True), ForeignKey("issues.id"), nullable=False)
     pr_url = Column(String, nullable=True)
     reported_at = Column(DateTime, nullable=False)
+
+class RepoFile(Base):
+    __tablename__ = "repo_files"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    repo_id = Column(UUID(as_uuid=True), ForeignKey("repos.id"), nullable=False)
+    file_path = Column(String, nullable=False)
+
+class FileCoupling(Base):
+    __tablename__ = "file_couplings"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    repo_id = Column(UUID(as_uuid=True), ForeignKey("repos.id"), nullable=False)
+    file_a = Column(String, nullable=False)
+    file_b = Column(String, nullable=False)
+    weight = Column(Integer, nullable=False)
