@@ -29,7 +29,7 @@ def score_issues_for_user(db: Session, repo_id: str, skill_profile_text: str, to
         if not issue:
             continue
 
-        avg_centrality = _avg_centrality_for_issue(db, repo_id, issue)
+        matched_files, avg_centrality = _matched_files_for_issue(db, repo_id, issue)
         staleness_days = _staleness_days(issue.updated_at)
         staleness_penalty = min(staleness_days / 365, 1.0)
 
@@ -39,6 +39,7 @@ def score_issues_for_user(db: Session, repo_id: str, skill_profile_text: str, to
             "issue": issue,
             "similarity": row.similarity,
             "centrality": avg_centrality,
+            "matched_files": matched_files,
             "staleness_days": staleness_days,
             "fit_score": fit_score
         })
@@ -90,3 +91,24 @@ def get_verified_open_issues(db: Session, repo, scored_candidates: list, needed:
 
     db.commit()
     return verified
+
+def _matched_files_for_issue(db: Session, repo_id: str, issue: Issue):
+    all_files = db.query(FileCentrality).filter(FileCentrality.repo_id == repo_id).all()
+    if not all_files:
+        return [], 0.0
+
+    issue_text = f"{issue.title or ''} {issue.body or ''}".lower()
+
+    mentioned = []
+    for f in all_files:
+        full_path = f.file_path.lower()
+        basename = full_path.split("/")[-1]
+        if full_path in issue_text or basename in issue_text:
+            mentioned.append(f)
+
+    if mentioned:
+        avg_score = sum(f.centrality_score for f in mentioned) / len(mentioned)
+        return [f.file_path for f in mentioned], avg_score
+
+    avg_score = sum(f.centrality_score for f in all_files) / len(all_files)
+    return [], avg_score
